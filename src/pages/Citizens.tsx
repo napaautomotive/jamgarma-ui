@@ -5,7 +5,7 @@ import { RiskBadge, MuloqotBadge, StatusBadge } from '../components/Badge';
 import { DEBTORS } from '../data/mock';
 import type { Debtor } from '../data/mock';
 import { fmtMoney } from '../utils/format';
-import { Search, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 15;
 const REGIONS = ['Barchasi', ...Array.from(new Set(DEBTORS.map(d => d.region)))];
@@ -39,8 +39,10 @@ export default function Citizens() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const toggleSelect = (id: number) =>
+  const toggleSelect = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const selectAll = () =>
     setSelected(paginated.length === paginated.filter(d => selected.includes(d.id)).length
@@ -100,15 +102,20 @@ export default function Citizens() {
               <th>Xavf</th>
               <th>Muloqot</th>
               <th>Holat</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
             {paginated.length === 0 ? (
-              <tr><td colSpan={11}><div className="empty-state"><p>Hech narsa topilmadi</p></div></td></tr>
+              <tr><td colSpan={10}><div className="empty-state"><p>Hech narsa topilmadi</p></div></td></tr>
             ) : paginated.map(d => (
-              <tr key={d.id}>
-                <td><input type="checkbox" className="cb" checked={selected.includes(d.id)} onChange={() => toggleSelect(d.id)} /></td>
+              <tr
+                key={d.id}
+                onClick={() => navigate(`/citizens/${d.id}`)}
+                style={{ cursor: 'pointer' }}
+              >
+                <td onClick={e => toggleSelect(e, d.id)}>
+                  <input type="checkbox" className="cb" checked={selected.includes(d.id)} onChange={() => {}} />
+                </td>
                 <td style={{ fontWeight: 600 }}>{d.full_name}</td>
                 <td className="muted">{d.application_id}</td>
                 <td className="muted">{d.phone}</td>
@@ -122,11 +129,6 @@ export default function Citizens() {
                 <td><RiskBadge level={d.risk_level} /></td>
                 <td><MuloqotBadge status={d.muloqot_status} /></td>
                 <td><StatusBadge status={d.status} /></td>
-                <td>
-                  <button className="btn btn-ghost btn-icon btn-sm" onClick={() => navigate(`/citizens/${d.id}`)} data-tooltip="Ko'rish">
-                    <Eye size={15} />
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>

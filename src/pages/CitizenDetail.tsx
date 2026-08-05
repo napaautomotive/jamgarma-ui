@@ -4,9 +4,8 @@ import Layout from '../components/Layout';
 import { RiskBadge, MuloqotBadge } from '../components/Badge';
 import { DEBTORS, CALL_SESSIONS } from '../data/mock';
 import type { MuloqotStatus } from '../data/mock';
-
 import { fmtMoney, fmtDuration, fmtDate } from '../utils/format';
-import { ArrowLeft, Phone, User, MapPin, Calendar } from 'lucide-react';
+import { ArrowLeft, Phone, User, MapPin, Calendar, Pencil, Check, X } from 'lucide-react';
 
 export default function CitizenDetail() {
   const { id } = useParams();
@@ -14,6 +13,18 @@ export default function CitizenDetail() {
   const debtor = DEBTORS.find(d => d.id === Number(id));
   const [notes, setNotes] = useState(debtor?.notes || '');
   const [muloqot, setMuloqot] = useState<MuloqotStatus>(debtor?.muloqot_status || null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    full_name: debtor?.full_name || '',
+    phone: debtor?.phone || '',
+    pinfl: debtor?.pinfl || '',
+    region: debtor?.region || '',
+    district: debtor?.district || '',
+    mahalla: debtor?.mahalla || '',
+    assistant_name: debtor?.assistant_name || '',
+    assistant_phone: debtor?.assistant_phone || '',
+    allocation_date: debtor?.allocation_date || '',
+  });
   const sessions = CALL_SESSIONS.filter(s => s.debtor_id === Number(id));
 
   if (!debtor) return (
@@ -22,52 +33,94 @@ export default function CitizenDetail() {
     </Layout>
   );
 
+  const saveEdit = () => setEditing(false);
+  const cancelEdit = () => { setForm({ full_name: debtor.full_name, phone: debtor.phone, pinfl: debtor.pinfl, region: debtor.region, district: debtor.district, mahalla: debtor.mahalla, assistant_name: debtor.assistant_name, assistant_phone: debtor.assistant_phone, allocation_date: debtor.allocation_date }); setEditing(false); };
+
   return (
     <Layout title="Qarzdor ma'lumotlari">
-      <button className="back-btn" onClick={() => navigate('/citizens')}>
-        <ArrowLeft size={15} /> Orqaga
-      </button>
+      {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button className="back-btn" onClick={() => navigate('/citizens')}>
+          <ArrowLeft size={15} /> Orqaga
+        </button>
+        {!editing ? (
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+            <Pencil size={14} /> Tahrirlash
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={cancelEdit}><X size={14} /> Bekor</button>
+            <button className="btn btn-primary btn-sm" onClick={saveEdit}><Check size={14} /> Saqlash</button>
+          </div>
+        )}
+      </div>
 
       {/* Profile */}
       <div className="card card-lg" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, marginBottom: 20 }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, flexShrink: 0 }}>
-            {debtor.full_name.split(' ').slice(0,2).map(w=>w[0]).join('')}
+            {(form.full_name || debtor.full_name).split(' ').slice(0, 2).map(w => w[0]).join('')}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800 }}>{debtor.full_name}</h2>
-              <RiskBadge level={debtor.risk_level} />
-              <MuloqotBadge status={muloqot} />
-            </div>
-            <div style={{ display: 'flex', gap: 20, marginTop: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)', display:'flex', gap:5, alignItems:'center' }}><Phone size={13}/>{debtor.phone}</span>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)', display:'flex', gap:5, alignItems:'center' }}><User size={13}/>PINFL: {debtor.pinfl}</span>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)', display:'flex', gap:5, alignItems:'center' }}><MapPin size={13}/>{debtor.region}, {debtor.district}</span>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)', display:'flex', gap:5, alignItems:'center' }}><Calendar size={13}/>{debtor.allocation_date}</span>
-            </div>
+            {editing ? (
+              <input className="input" style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }} value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{form.full_name}</h2>
+                <RiskBadge level={debtor.risk_level} />
+                <MuloqotBadge status={muloqot} />
+              </div>
+            )}
+            {!editing && (
+              <div style={{ display: 'flex', gap: 20, marginTop: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 5, alignItems: 'center' }}><Phone size={13} />{form.phone}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 5, alignItems: 'center' }}><User size={13} />PINFL: {form.pinfl}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 5, alignItems: 'center' }}><MapPin size={13} />{form.region}, {form.district}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 5, alignItems: 'center' }}><Calendar size={13} />{form.allocation_date}</span>
+              </div>
+            )}
           </div>
-          <div style={{ textAlign:'right' }}>
+          <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>ID Raqam</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent-light)' }}>{debtor.application_id}</div>
           </div>
         </div>
 
-        <div className="detail-grid">
-          {[
-            { label: 'Viloyat', value: debtor.region },
-            { label: 'Tuman', value: debtor.district },
-            { label: 'MFY', value: debtor.mahalla },
-            { label: 'Ajratilgan sana', value: debtor.allocation_date },
-            { label: 'Yordamchi', value: debtor.assistant_name },
-            { label: 'Yordamchi tel.', value: debtor.assistant_phone },
-          ].map(item => (
-            <div className="detail-item" key={item.label}>
-              <div className="detail-label">{item.label}</div>
-              <div className="detail-value">{item.value || '—'}</div>
-            </div>
-          ))}
-        </div>
+        {editing ? (
+          <div className="detail-grid">
+            {[
+              { label: 'Telefon', key: 'phone' },
+              { label: 'PINFL', key: 'pinfl' },
+              { label: 'Viloyat', key: 'region' },
+              { label: 'Tuman', key: 'district' },
+              { label: 'MFY', key: 'mahalla' },
+              { label: 'Ajratilgan sana', key: 'allocation_date' },
+              { label: 'Yordamchi', key: 'assistant_name' },
+              { label: 'Yordamchi tel.', key: 'assistant_phone' },
+            ].map(f => (
+              <div className="detail-item" key={f.key}>
+                <div className="detail-label">{f.label}</div>
+                <input className="input" value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="detail-grid">
+            {[
+              { label: 'Viloyat', value: form.region },
+              { label: 'Tuman', value: form.district },
+              { label: 'MFY', value: form.mahalla },
+              { label: 'Ajratilgan sana', value: form.allocation_date },
+              { label: 'Yordamchi', value: form.assistant_name },
+              { label: 'Yordamchi tel.', value: form.assistant_phone },
+            ].map(item => (
+              <div className="detail-item" key={item.label}>
+                <div className="detail-label">{item.label}</div>
+                <div className="detail-value">{item.value || '—'}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Financial cards */}

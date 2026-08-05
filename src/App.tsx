@@ -7,6 +7,7 @@ import CallCenter from './pages/CallCenter';
 import Recordings from './pages/Recordings';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import UserDetail from './pages/UserDetail';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/recordings" element={<Recordings />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/users/:id" element={<UserDetail />} />
       </Routes>
     </BrowserRouter>
   );
