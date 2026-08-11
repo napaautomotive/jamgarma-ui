@@ -141,8 +141,11 @@ export default function Kpi() {
       };
     }
 
-    const monthSeedFactor = ((year * 12 + month * 9) % 250);
-    const sysCompleted = 1020 + monthSeedFactor;
+    let totalSum = 0;
+    opsList.forEach(op => {
+      totalSum += getCompletedCallsForOperator(op, year, month);
+    });
+    const sysCompleted = totalSum > 0 ? totalSum : 1020;
     const sysToday = month === 8 ? Math.min(baseDailyTarget, 48) : 0;
     const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
     const completedPast = Math.max(0, sysCompleted - sysToday);
