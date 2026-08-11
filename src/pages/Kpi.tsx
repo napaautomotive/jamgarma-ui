@@ -60,8 +60,29 @@ export function getCompletedCallsForOperator(op: any, defaultTarget: number, yea
   return Math.max(0, Math.round(defaultTarget * (0.55 + monthSeedFactor)));
 }
 
+export function generatePastMonthsList(count = 12) {
+  const months = [];
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(currentYear, currentMonth - 1 - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const val = `${y}-${String(m).padStart(2, '0')}`;
+    const mName = d.toLocaleString('uz-UZ', { month: 'long', year: 'numeric' });
+    const capitalizedName = mName.charAt(0).toUpperCase() + mName.slice(1);
+    const label = i === 0 ? `${capitalizedName} (Joriy oy)` : capitalizedName;
+
+    months.push({ value: val, label });
+  }
+  return months;
+}
+
 export default function Kpi() {
-  const [selectedMonth, setSelectedMonth] = useState('2026-08');
+  const monthOptions = useMemo(() => generatePastMonthsList(12), []);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => monthOptions[0]?.value || '2026-08');
   const [selectedOperatorId, setSelectedOperatorId] = useState<string | 'all'>('all');
   const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
     const saved = localStorage.getItem('kpi_monthly_target');
@@ -182,11 +203,10 @@ export default function Kpi() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <select className="input" style={{ width: 160 }} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-            <option value="2026-08">Avgust 2026</option>
-            <option value="2026-09">Sentabr 2026</option>
-            <option value="2026-07">Iyul 2026</option>
-            <option value="2026-06">Iyun 2026</option>
+          <select className="input" style={{ width: 210 }} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+            {monthOptions.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
           </select>
           <button
             className="btn btn-primary"
