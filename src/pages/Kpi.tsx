@@ -48,11 +48,15 @@ export function getCompletedCallsForOperator(op: any, year: number, month: numbe
   }
   if (op.call_sessions && Array.isArray(op.call_sessions)) {
     const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-    const filtered = op.call_sessions.filter((s: any) => {
+    const uniqueDebtors = new Set<string>();
+    op.call_sessions.forEach((s: any) => {
       const dateStr = s.started_at || s.created_at;
-      return dateStr && dateStr.startsWith(monthStr);
+      if (dateStr && dateStr.startsWith(monthStr)) {
+        const dId = s.debtor_id || s.debtor?.id;
+        uniqueDebtors.add(dId ? String(dId) : `session_${s.id}`);
+      }
     });
-    return filtered.length;
+    return uniqueDebtors.size;
   }
   if (typeof op.total_calls === 'number') {
     return op.total_calls;
