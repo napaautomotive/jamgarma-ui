@@ -76,8 +76,10 @@ export default function Kpi() {
   // Rollover / Carryover calculation
   const { rolloverCalls, todayTargetWithRollover, monthlyCompletedScope, todayCompletedScope } = useMemo(() => {
     if (selectedOp) {
-      const completed = Math.round(targetScopeMonthly * 0.85);
-      const todayCalls = 22;
+      const opIdNum = Number(selectedOp.id || 1);
+      const completed = Math.max(40, Math.round(targetScopeMonthly * (0.62 + ((opIdNum * 19) % 32) / 100)));
+      const todayCalls = Math.max(4, Math.round(baseDailyTarget * (0.45 + ((opIdNum * 13) % 45) / 100)));
+
       const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
       const completedPast = Math.max(0, completed - todayCalls);
       const rollover = Math.max(0, expectedPast - completedPast);
@@ -125,7 +127,8 @@ export default function Kpi() {
         };
       }
 
-      const completed = Math.round(targetPerOp * 0.85) - idx * 25;
+      const opIdNum = Number(op.id || idx + 1);
+      const completed = Math.max(40, Math.round(targetPerOp * (0.62 + ((opIdNum * 19) % 32) / 100)));
       const pct = Math.min(100, Math.round((completed / targetPerOp) * 100));
       const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
       let status = pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
