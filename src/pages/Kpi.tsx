@@ -41,7 +41,7 @@ export function getUzbekistanWorkingDays(year: number, month: number) {
   };
 }
 
-export function getCompletedCallsForOperator(op: any, defaultTarget: number, year: number, month: number) {
+export function getCompletedCallsForOperator(op: any, year: number, month: number) {
   if (!op) return 0;
   if (op.is_active === false || op.is_active === 0 || op.is_active === "0") {
     return 0;
@@ -54,10 +54,17 @@ export function getCompletedCallsForOperator(op: any, defaultTarget: number, yea
     });
     return filtered.length;
   }
+  if (typeof op.total_calls === 'number') {
+    return op.total_calls;
+  }
+  if (typeof op.completed_calls === 'number') {
+    return op.completed_calls;
+  }
 
+  // Absolute completed calls per operator (strictly independent of monthlyTarget)
   const opIdNum = Number(op.id || 1);
-  const monthSeedFactor = ((year * 12 + month * 7 + opIdNum * 13) % 31) / 100;
-  return Math.max(0, Math.round(defaultTarget * (0.55 + monthSeedFactor)));
+  const baseCalls = 280 + ((opIdNum * 47 + year * 12 + month * 7) % 150);
+  return baseCalls;
 }
 
 export const UZ_MONTH_NAMES = [
@@ -121,7 +128,7 @@ export default function Kpi() {
   // Rollover / Carryover calculation
   const { rolloverCalls, todayTargetWithRollover, monthlyCompletedScope, todayCompletedScope } = useMemo(() => {
     if (selectedOp) {
-      const completed = getCompletedCallsForOperator(selectedOp, targetScopeMonthly, year, month);
+      const completed = getCompletedCallsForOperator(selectedOp, year, month);
       const todayCalls = month === 8 ? Math.min(completed, 22) : 0;
       const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
       const completedPast = Math.max(0, completed - todayCalls);
@@ -134,8 +141,8 @@ export default function Kpi() {
       };
     }
 
-    const monthSeedFactor = ((year * 12 + month * 9) % 27) / 100;
-    const sysCompleted = Math.round(monthlyTarget * (0.65 + monthSeedFactor));
+    const monthSeedFactor = ((year * 12 + month * 9) % 250);
+    const sysCompleted = 1020 + monthSeedFactor;
     const sysToday = month === 8 ? Math.min(baseDailyTarget, 48) : 0;
     const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
     const completedPast = Math.max(0, sysCompleted - sysToday);
@@ -147,7 +154,7 @@ export default function Kpi() {
       monthlyCompletedScope: sysCompleted,
       todayCompletedScope: sysToday,
     };
-  }, [selectedOp, targetScopeMonthly, baseDailyTarget, pastWorkingDays, monthlyTarget, year, month]);
+  }, [selectedOp, targetScopeMonthly, baseDailyTarget, pastWorkingDays, year, month]);
 
   const monthlyProgressPct = Math.round((monthlyCompletedScope / targetScopeMonthly) * 100);
   const remainingCalls = Math.max(0, targetScopeMonthly - monthlyCompletedScope);
@@ -171,7 +178,7 @@ export default function Kpi() {
         };
       }
 
-      const completed = getCompletedCallsForOperator(op, targetPerOp, year, month);
+      const completed = getCompletedCallsForOperator(op, year, month);
       const pct = Math.min(100, Math.round((completed / Math.max(1, targetPerOp)) * 100));
       const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
       let status = completed === 0 ? 'Ortda qolmoqda' : pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
