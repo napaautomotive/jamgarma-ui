@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { Target, TrendingUp, Award, Sparkles, Flame, Users, Calendar, Edit3, UserCheck, XCircle, AlertTriangle } from 'lucide-react';
 import { USERS } from '../data/mock';
@@ -96,16 +96,26 @@ export function generatePastMonthsList(count = 12) {
   return months;
 }
 
+export function getTargetForMonth(monthKey: string): number {
+  const saved = localStorage.getItem(`kpi_monthly_target_${monthKey}`);
+  if (saved) return Number(saved);
+  const globalSaved = localStorage.getItem('kpi_monthly_target');
+  return globalSaved ? Number(globalSaved) : 1500;
+}
+
 export default function Kpi() {
   const monthOptions = useMemo(() => generatePastMonthsList(12), []);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => monthOptions[0]?.value || '2026-08');
   const [selectedOperatorId, setSelectedOperatorId] = useState<string | 'all'>('all');
   const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
-    const saved = localStorage.getItem('kpi_monthly_target');
-    return saved ? Number(saved) : 1500;
+    return getTargetForMonth(selectedMonth);
   });
   const [isEditing, setIsEditing] = useState(false);
   const [tempTarget, setTempTarget] = useState(monthlyTarget);
+
+  useEffect(() => {
+    setMonthlyTarget(getTargetForMonth(selectedMonth));
+  }, [selectedMonth]);
 
   const [year, month] = selectedMonth.split('-').map(Number);
 
@@ -204,7 +214,7 @@ export default function Kpi() {
   const saveTarget = () => {
     if (tempTarget && tempTarget > 0) {
       setMonthlyTarget(tempTarget);
-      localStorage.setItem('kpi_monthly_target', String(tempTarget));
+      localStorage.setItem(`kpi_monthly_target_${selectedMonth}`, String(tempTarget));
     }
     setIsEditing(false);
   };
