@@ -371,9 +371,9 @@ export default function Kpi() {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
             <div style={{ fontSize: 42, fontWeight: 900, color: 'var(--text-main)' }}>{monthlyProgressPct}%</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{monthlyCompletedScope.toLocaleString('ru-RU')} / {targetScopeMonthly.toLocaleString('ru-RU')} ta qo'ng'iroq</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{monthlyCompletedScope.toLocaleString('ru-RU')} ta unikal muloqot</div>
             <div style={{ width: '100%', height: 10, background: '#e2e8f0', borderRadius: 5, marginTop: 16, overflow: 'hidden' }}>
-              <div style={{ width: `${monthlyProgressPct}%`, height: '100%', background: '#22c55e', borderRadius: 5 }} />
+              <div style={{ width: `${Math.min(100, monthlyProgressPct)}%`, height: '100%', background: '#22c55e', borderRadius: 5 }} />
             </div>
           </div>
 
