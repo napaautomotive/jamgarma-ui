@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
-import { Target, TrendingUp, Award, Sparkles, Flame, Users, Calendar, Edit3 } from 'lucide-react';
+import { Target, TrendingUp, Award, Sparkles, Flame, Users, Calendar, Edit3, UserCheck, XCircle, AlertTriangle } from 'lucide-react';
 import { USERS } from '../data/mock';
 
 export function getUzbekistanWorkingDays(year: number, month: number) {
@@ -43,6 +43,7 @@ export function getUzbekistanWorkingDays(year: number, month: number) {
 
 export default function Kpi() {
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
+  const [selectedOperatorId, setSelectedOperatorId] = useState<string | 'all'>('all');
   const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
     const saved = localStorage.getItem('kpi_monthly_target');
     return saved ? Number(saved) : 1500;
@@ -56,28 +57,62 @@ export default function Kpi() {
     return getUzbekistanWorkingDays(year, month);
   }, [year, month]);
 
-  const dailyTarget = Math.ceil(monthlyTarget / Math.max(1, workingDays));
+  const opsList = useMemo(() => USERS.filter(u => u.role === 'Operator'), []);
+  const activeOps = useMemo(() => opsList.filter(u => (u as any).is_active !== false), [opsList]);
 
-  // Filtered stats by month
-  const monthlyCompleted = useMemo(() => {
-    const seed = (year * 12 + month) % 5;
-    return Math.round(monthlyTarget * (0.75 + seed * 0.04));
-  }, [year, month, monthlyTarget]);
+  const selectedOp = useMemo(() => {
+    if (selectedOperatorId === 'all') return null;
+    return opsList.find(u => String(u.id) === String(selectedOperatorId)) || null;
+  }, [opsList, selectedOperatorId]);
 
-  const todayCompleted = Math.min(dailyTarget, 48);
-  const monthlyProgressPct = Math.round((monthlyCompleted / monthlyTarget) * 100);
-  const remainingCalls = Math.max(0, monthlyTarget - monthlyCompleted);
+  // Target scope
+  const targetScopeMonthly = useMemo(() => {
+    if (!selectedOp) return monthlyTarget;
+    return Math.ceil(monthlyTarget / Math.max(1, activeOps.length));
+  }, [selectedOp, monthlyTarget, activeOps]);
+
+  const baseDailyTarget = Math.ceil(targetScopeMonthly / Math.max(1, workingDays));
+
+  // Rollover / Carryover calculation
+  const { rolloverCalls, todayTargetWithRollover, monthlyCompletedScope, todayCompletedScope } = useMemo(() => {
+    if (selectedOp) {
+      const completed = Math.round(targetScopeMonthly * 0.85);
+      const todayCalls = 22;
+      const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
+      const completedPast = Math.max(0, completed - todayCalls);
+      const rollover = Math.max(0, expectedPast - completedPast);
+      return {
+        rolloverCalls: rollover,
+        todayTargetWithRollover: baseDailyTarget + rollover,
+        monthlyCompletedScope: completed,
+        todayCompletedScope: todayCalls,
+      };
+    }
+
+    const sysCompleted = Math.round(monthlyTarget * 0.78);
+    const sysToday = Math.min(baseDailyTarget, 48);
+    const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
+    const completedPast = Math.max(0, sysCompleted - sysToday);
+    const rollover = Math.max(0, expectedPast - completedPast);
+
+    return {
+      rolloverCalls: rollover,
+      todayTargetWithRollover: baseDailyTarget + rollover,
+      monthlyCompletedScope: sysCompleted,
+      todayCompletedScope: sysToday,
+    };
+  }, [selectedOp, targetScopeMonthly, baseDailyTarget, pastWorkingDays, monthlyTarget]);
+
+  const monthlyProgressPct = Math.round((monthlyCompletedScope / targetScopeMonthly) * 100);
+  const remainingCalls = Math.max(0, targetScopeMonthly - monthlyCompletedScope);
   const requiredDailyRate = Math.ceil(remainingCalls / remainingWorkingDays);
 
   const operators = useMemo(() => {
-    const ops = USERS.filter(u => u.role === 'Operator');
-    const activeOps = ops.filter(u => (u as any).is_active !== false);
     const activeCount = Math.max(1, activeOps.length);
     const targetPerOp = Math.ceil(monthlyTarget / activeCount);
 
-    return ops.map((op, idx) => {
+    return opsList.map((op, idx) => {
       const isActive = (op as any).is_active !== false;
-
       if (!isActive) {
         return {
           ...op,
@@ -104,7 +139,7 @@ export default function Kpi() {
         isActive: true
       };
     });
-  }, [monthlyTarget, pastWorkingDays]);
+  }, [opsList, activeOps, monthlyTarget, pastWorkingDays]);
 
   const saveTarget = () => {
     if (tempTarget && tempTarget > 0) {
@@ -118,8 +153,13 @@ export default function Kpi() {
     <Layout title="KPI Boshqaruvi">
       <div className="page-header">
         <div>
-          <div className="page-title">KPI va Oylik Maqsadlar</div>
-          <div className="page-sub">O'zbekiston kalendari bo'yicha ish kunlari va rasmiy bayramlar inobatga olingan kunlik avto-reja</div>
+          <div className="page-title">
+            KPI va Oylik Maqsadlar
+            {selectedOp && <span style={{ color: 'var(--accent)', marginLeft: 12, fontSize: 16 }}>({selectedOp.name})</span>}
+          </div>
+          <div className="page-sub">
+            {selectedOp ? `${selectedOp.name} uchun shaxsiy KPI ko'rsatkichlari va o'tgan kunlar qarzdorligi (Rollover)` : "O'zbekiston kalendari bo'yicha ish kunlari va bajarilmagan kunlik normaning keyingi kunga o'tish (Rollover) tahlili"}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select className="input" style={{ width: 160 }} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
@@ -136,6 +176,57 @@ export default function Kpi() {
             <Edit3 size={14} /> Rejani tahrirlash
           </button>
         </div>
+      </div>
+
+      {/* TOP Operator Pills Bar */}
+      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 12, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: '8px 16px',
+            borderRadius: 12,
+            background: selectedOperatorId === 'all' ? 'var(--text-main)' : 'var(--card-bg)',
+            color: selectedOperatorId === 'all' ? '#ffffff' : 'var(--text-muted)',
+            border: '1px solid var(--border)',
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            whiteSpace: 'nowrap'
+          }}
+          onClick={() => setSelectedOperatorId('all')}
+        >
+          <Users size={15} /> Barchasi (Barcha operatorlar)
+        </div>
+        {opsList.map(op => {
+          const isSel = String(selectedOperatorId) === String(op.id);
+          const isActive = (op as any).is_active !== false;
+          return (
+            <div
+              key={op.id}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 12,
+                background: isSel ? 'var(--text-main)' : 'var(--card-bg)',
+                color: isSel ? '#ffffff' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                whiteSpace: 'nowrap',
+                opacity: isActive ? 1 : 0.6
+              }}
+              onClick={() => setSelectedOperatorId(String(op.id))}
+            >
+              {isActive ? <UserCheck size={15} color={isSel ? '#ffffff' : '#22c55e'} /> : <XCircle size={15} color={isSel ? '#ffffff' : '#ef4444'} />}
+              <span>{op.name}</span>
+            </div>
+          );
+        })}
       </div>
 
       {isEditing && (
@@ -160,7 +251,7 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>OYLIK REJA MAQSADI</span>
             <Target size={20} color="#2563eb" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{monthlyTarget.toLocaleString('ru-RU')} ta</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{targetScopeMonthly.toLocaleString('ru-RU')} ta</div>
           <div className="muted" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Calendar size={12} /> {workingDays} ish kuni ({totalDays} kundan)
           </div>
@@ -171,17 +262,24 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>OYLIK BAJARILDI</span>
             <TrendingUp size={20} color="#22c55e" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--success)' }}>{monthlyCompleted.toLocaleString('ru-RU')} ta</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--success)' }}>{monthlyCompletedScope.toLocaleString('ru-RU')} ta</div>
           <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>Rejaning {monthlyProgressPct}% qismi bajarildi</div>
         </div>
 
         <div className="kpi-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>KUNLIK AVTO-REJA</span>
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>BUGUNGI NORMA (+ROLLOVER)</span>
             <Sparkles size={20} color="#8b5cf6" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{dailyTarget} ta / ish kuni</div>
-          <div className="muted" style={{ fontSize: 12 }}>{monthlyTarget} ta / {workingDays} ish kuni</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{todayTargetWithRollover} ta / bugun</div>
+          <div className="muted" style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>Baza: {baseDailyTarget} ta</span>
+            {rolloverCalls > 0 && (
+              <span style={{ background: '#fee2e2', color: '#ef4444', padding: '1px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <AlertTriangle size={11} /> +{rolloverCalls} ta o'tgan kunlar qarzi
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="kpi-card" style={{ borderLeft: '4px solid #f59e0b' }}>
@@ -189,8 +287,8 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>BUGUNGI BAJARILGAN</span>
             <Flame size={20} color="#f59e0b" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--warning)' }}>{todayCompleted} ta</div>
-          <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>Kunlik norma 98% bajarildi</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--warning)' }}>{todayCompletedScope} ta</div>
+          <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>Kunlik jami rejaning {Math.min(100, Math.round((todayCompletedScope / Math.max(1, todayTargetWithRollover)) * 100))}% qismi</div>
         </div>
       </div>
 
@@ -204,7 +302,7 @@ export default function Kpi() {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
             <div style={{ fontSize: 42, fontWeight: 900, color: 'var(--text-main)' }}>{monthlyProgressPct}%</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{monthlyCompleted.toLocaleString('ru-RU')} / {monthlyTarget.toLocaleString('ru-RU')} ta qo'ng'iroq</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{monthlyCompletedScope.toLocaleString('ru-RU')} / {targetScopeMonthly.toLocaleString('ru-RU')} ta qo'ng'iroq</div>
             <div style={{ width: '100%', height: 10, background: '#e2e8f0', borderRadius: 5, marginTop: 16, overflow: 'hidden' }}>
               <div style={{ width: `${monthlyProgressPct}%`, height: '100%', background: '#22c55e', borderRadius: 5 }} />
             </div>
@@ -212,9 +310,15 @@ export default function Kpi() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
-              <span className="muted">Jami ish kunlari:</span>
-              <strong>{workingDays} kun</strong>
+              <span className="muted">Baza kunlik norma:</span>
+              <strong>{baseDailyTarget} ta / ish kuni</strong>
             </div>
+            {rolloverCalls > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#fee2e2', color: '#b91c1c', borderRadius: 8 }}>
+                <span>O'tgan kunlardan qarzdorlik (Rollover):</span>
+                <strong>+{rolloverCalls} ta</strong>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
               <span className="muted">Qolgan qo'ng'iroqlar:</span>
               <strong style={{ color: 'var(--danger)' }}>{remainingCalls.toLocaleString('ru-RU')} ta</strong>
@@ -249,31 +353,38 @@ export default function Kpi() {
                 </tr>
               </thead>
               <tbody>
-                {operators.map(op => (
-                  <tr key={op.id}>
-                    <td style={{ fontWeight: 600 }}>{op.name}</td>
-                    <td>{op.isActive ? `${op.target} ta` : '0 ta (Nofaol)'}</td>
-                    <td><strong style={{ color: op.isActive ? 'var(--success)' : '#94a3b8' }}>{op.completed} ta</strong></td>
-                    <td style={{ minWidth: 120 }}>
-                      {op.isActive ? (
-                        <>
-                          <div style={{ fontSize: 12, fontWeight: 700 }}>{op.pct}%</div>
-                          <div style={{ height: 6, width: '100%', background: '#e2e8f0', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
-                            <div style={{ width: `${op.pct}%`, height: '100%', background: op.pct >= 90 ? '#22c55e' : '#3b82f6' }} />
-                          </div>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Hisoblanmaydi</span>
-                      )}
-                    </td>
-                    <td>{op.isActive ? `${op.dailyAvg} ta/ish kuni` : '—'}</td>
-                    <td>
-                      <span className={`badge ${op.status === "A'lo" ? 'badge-green' : op.status === 'Rejada' ? 'badge-indigo' : op.status === 'Nofaol' ? 'badge-gray' : 'badge-amber'}`}>
-                        {op.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {operators.map(op => {
+                  const isSel = String(selectedOperatorId) === String(op.id);
+                  return (
+                    <tr
+                      key={op.id}
+                      style={{ background: isSel ? 'rgba(37, 99, 235, 0.08)' : undefined, cursor: 'pointer' }}
+                      onClick={() => setSelectedOperatorId(isSel ? 'all' : String(op.id))}
+                    >
+                      <td style={{ fontWeight: 600 }}>{op.name}</td>
+                      <td>{op.isActive ? `${op.target} ta` : '0 ta (Nofaol)'}</td>
+                      <td><strong style={{ color: op.isActive ? 'var(--success)' : '#94a3b8' }}>{op.completed} ta</strong></td>
+                      <td style={{ minWidth: 120 }}>
+                        {op.isActive ? (
+                          <>
+                            <div style={{ fontSize: 12, fontWeight: 700 }}>{op.pct}%</div>
+                            <div style={{ height: 6, width: '100%', background: '#e2e8f0', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
+                              <div style={{ width: `${op.pct}%`, height: '100%', background: op.pct >= 90 ? '#22c55e' : '#3b82f6' }} />
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#94a3b8' }}>Hisoblanmaydi</span>
+                        )}
+                      </td>
+                      <td>{op.isActive ? `${op.dailyAvg} ta/ish kuni` : '—'}</td>
+                      <td>
+                        <span className={`badge ${op.status === "A'lo" ? 'badge-green' : op.status === 'Rejada' ? 'badge-indigo' : op.status === 'Nofaol' ? 'badge-gray' : 'badge-amber'}`}>
+                          {op.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
