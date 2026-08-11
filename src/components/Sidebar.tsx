@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Phone, PlayCircle,
-  BarChart3, UserCog, LogOut
+  BarChart3, UserCog, LogOut, Target
 } from 'lucide-react';
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/citizens', icon: Users, label: 'Fuqarolar' },
   { to: '/callcenter', icon: Phone, label: 'Call Center' },
   { to: '/recordings', icon: PlayCircle, label: 'Yozuvlar' },
+  { to: '/kpi', icon: Target, label: 'KPI Boshqaruvi' },
   { to: '/reports', icon: BarChart3, label: 'Hisobotlar' },
   { to: '/users', icon: UserCog, label: 'Foydalanuvchilar' },
 ];

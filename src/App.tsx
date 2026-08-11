@@ -8,6 +8,7 @@ import Recordings from './pages/Recordings';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import UserDetail from './pages/UserDetail';
+import Kpi from './pages/Kpi';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/citizens/:id" element={<CitizenDetail />} />
         <Route path="/callcenter" element={<CallCenter />} />
         <Route path="/recordings" element={<Recordings />} />
+        <Route path="/kpi" element={<Kpi />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<Users />} />
         <Route path="/users/:id" element={<UserDetail />} />
