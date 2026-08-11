@@ -1,35 +1,83 @@
 import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
-import { Target, TrendingUp, Award, Sparkles, Flame, Users } from 'lucide-react';
+import { Target, TrendingUp, Award, Sparkles, Flame, Users, Calendar, Edit3 } from 'lucide-react';
 import { USERS } from '../data/mock';
 
-const MONTHLY_TARGET = 1500;
+export function getUzbekistanWorkingDays(year: number, month: number) {
+  const totalDays = new Date(year, month, 0).getDate();
+  let workingDays = 0;
+  let pastWorkingDays = 0;
+  const today = new Date();
+
+  const fixedHolidays = new Set([
+    '1-1', '3-8', '3-21', '5-9', '9-1', '10-1', '12-8',
+  ]);
+
+  for (let day = 1; day <= totalDays; day++) {
+    const d = new Date(year, month - 1, day);
+    const dayOfWeek = d.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = fixedHolidays.has(`${month}-${day}`);
+
+    if (!isWeekend && !isHoliday) {
+      workingDays++;
+      if (
+        year < today.getFullYear() ||
+        (year === today.getFullYear() && month < today.getMonth() + 1) ||
+        (year === today.getFullYear() && month === today.getMonth() + 1 && day <= today.getDate())
+      ) {
+        pastWorkingDays++;
+      }
+    }
+  }
+
+  const remainingWorkingDays = Math.max(1, workingDays - pastWorkingDays);
+
+  return {
+    totalDays,
+    workingDays,
+    pastWorkingDays,
+    remainingWorkingDays,
+  };
+}
 
 export default function Kpi() {
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
+  const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
+    const saved = localStorage.getItem('kpi_monthly_target');
+    return saved ? Number(saved) : 1500;
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempTarget, setTempTarget] = useState(monthlyTarget);
 
-  // Days calculations
-  const daysInMonth = 31;
-  const currentDay = 11;
-  const remainingDays = daysInMonth - currentDay;
-  const dailyTarget = Math.ceil(MONTHLY_TARGET / daysInMonth); // 49 calls/day
+  const [year, month] = selectedMonth.split('-').map(Number);
 
-  // Completed calls
-  const monthlyCompleted = 1184;
-  const todayCompleted = 48;
-  const monthlyProgressPct = Math.round((monthlyCompleted / MONTHLY_TARGET) * 100);
-  const remainingCalls = MONTHLY_TARGET - monthlyCompleted;
-  const requiredDailyRate = Math.ceil(remainingCalls / remainingDays);
+  const { totalDays, workingDays, pastWorkingDays, remainingWorkingDays } = useMemo(() => {
+    return getUzbekistanWorkingDays(year, month);
+  }, [year, month]);
+
+  const dailyTarget = Math.ceil(monthlyTarget / Math.max(1, workingDays));
+
+  // Filtered stats by month
+  const monthlyCompleted = useMemo(() => {
+    const seed = (year * 12 + month) % 5;
+    return Math.round(monthlyTarget * (0.75 + seed * 0.04));
+  }, [year, month, monthlyTarget]);
+
+  const todayCompleted = Math.min(dailyTarget, 48);
+  const monthlyProgressPct = Math.round((monthlyCompleted / monthlyTarget) * 100);
+  const remainingCalls = Math.max(0, monthlyTarget - monthlyCompleted);
+  const requiredDailyRate = Math.ceil(remainingCalls / remainingWorkingDays);
 
   const operators = useMemo(() => {
     const ops = USERS.filter(u => u.role === 'Operator');
     const count = ops.length || 4;
-    const targetPerOp = Math.ceil(MONTHLY_TARGET / count);
+    const targetPerOp = Math.ceil(monthlyTarget / count);
 
     return ops.map((op, idx) => {
-      const completed = 360 - idx * 42;
+      const completed = Math.round(targetPerOp * 0.85) - idx * 25;
       const pct = Math.min(100, Math.round((completed / targetPerOp) * 100));
-      const dailyAvg = Math.round((completed / currentDay) * 10) / 10;
+      const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
       let status = pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
       return {
         ...op,
@@ -40,22 +88,54 @@ export default function Kpi() {
         status
       };
     });
-  }, []);
+  }, [monthlyTarget, pastWorkingDays]);
+
+  const saveTarget = () => {
+    if (tempTarget && tempTarget > 0) {
+      setMonthlyTarget(tempTarget);
+      localStorage.setItem('kpi_monthly_target', String(tempTarget));
+    }
+    setIsEditing(false);
+  };
 
   return (
     <Layout title="KPI Boshqaruvi">
       <div className="page-header">
         <div>
           <div className="page-title">KPI va Oylik Maqsadlar</div>
-          <div className="page-sub">Oylik 1 500 ta qo'ng'iroq maqsadi va operatorlar ko'rsatkichlari</div>
+          <div className="page-sub">O'zbekiston kalendari bo'yicha ish kunlari va rasmiy bayramlar inobatga olingan kunlik avto-reja</div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select className="input" style={{ width: 160 }} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
             <option value="2026-08">Avgust 2026</option>
+            <option value="2026-09">Sentabr 2026</option>
             <option value="2026-07">Iyul 2026</option>
+            <option value="2026-06">Iyun 2026</option>
           </select>
+          <button
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => { setTempTarget(monthlyTarget); setIsEditing(true); }}
+          >
+            <Edit3 size={14} /> Rejani tahrirlash
+          </button>
         </div>
       </div>
+
+      {isEditing && (
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--accent)', borderRadius: 12, padding: 16, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <label style={{ fontWeight: 600, fontSize: 14 }}>Yangi oylik maqsad (qo'ng'iroqlar soni):</label>
+          <input
+            type="number"
+            className="input"
+            style={{ width: 160 }}
+            value={tempTarget}
+            onChange={e => setTempTarget(Number(e.target.value))}
+          />
+          <button className="btn btn-primary" onClick={saveTarget}>Saqlash</button>
+          <button className="btn" onClick={() => setIsEditing(false)}>Bekor qilish</button>
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -64,8 +144,10 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>OYLIK REJA MAQSADI</span>
             <Target size={20} color="#2563eb" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>1 500 ta</div>
-          <div className="muted" style={{ fontSize: 12 }}>Avgust oyi uchun umumiy maqsad</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{monthlyTarget.toLocaleString('ru-RU')} ta</div>
+          <div className="muted" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Calendar size={12} /> {workingDays} ish kuni ({totalDays} kundan)
+          </div>
         </div>
 
         <div className="kpi-card" style={{ borderLeft: '4px solid #22c55e' }}>
@@ -73,7 +155,7 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>OYLIK BAJARILDI</span>
             <TrendingUp size={20} color="#22c55e" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--success)' }}>1 184 ta</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--success)' }}>{monthlyCompleted.toLocaleString('ru-RU')} ta</div>
           <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>Rejaning {monthlyProgressPct}% qismi bajarildi</div>
         </div>
 
@@ -82,8 +164,8 @@ export default function Kpi() {
             <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>KUNLIK AVTO-REJA</span>
             <Sparkles size={20} color="#8b5cf6" />
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{dailyTarget} ta / kun</div>
-          <div className="muted" style={{ fontSize: 12 }}>1500 ta / 31 kun bo'linishi</div>
+          <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0', color: 'var(--text-main)' }}>{dailyTarget} ta / ish kuni</div>
+          <div className="muted" style={{ fontSize: 12 }}>{monthlyTarget} ta / {workingDays} ish kuni</div>
         </div>
 
         <div className="kpi-card" style={{ borderLeft: '4px solid #f59e0b' }}>
@@ -106,7 +188,7 @@ export default function Kpi() {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
             <div style={{ fontSize: 42, fontWeight: 900, color: 'var(--text-main)' }}>{monthlyProgressPct}%</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>1 184 / 1 500 ta qo'ng'iroq</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{monthlyCompleted.toLocaleString('ru-RU')} / {monthlyTarget.toLocaleString('ru-RU')} ta qo'ng'iroq</div>
             <div style={{ width: '100%', height: 10, background: '#e2e8f0', borderRadius: 5, marginTop: 16, overflow: 'hidden' }}>
               <div style={{ width: `${monthlyProgressPct}%`, height: '100%', background: '#22c55e', borderRadius: 5 }} />
             </div>
@@ -114,16 +196,20 @@ export default function Kpi() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
-              <span className="muted">Qolgan qo'ng'iroqlar:</span>
-              <strong style={{ color: 'var(--danger)' }}>{remainingCalls} ta</strong>
+              <span className="muted">Jami ish kunlari:</span>
+              <strong>{workingDays} kun</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
-              <span className="muted">Qolgan kunlar:</span>
-              <strong>{remainingDays} kun</strong>
+              <span className="muted">Qolgan qo'ng'iroqlar:</span>
+              <strong style={{ color: 'var(--danger)' }}>{remainingCalls.toLocaleString('ru-RU')} ta</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
+              <span className="muted">Qolgan ish kunlari:</span>
+              <strong>{remainingWorkingDays} ish kuni</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 8 }}>
               <span className="muted">Kerakli kunlik norma:</span>
-              <strong style={{ color: 'var(--accent)' }}>{requiredDailyRate} ta / kun</strong>
+              <strong style={{ color: 'var(--accent)' }}>{requiredDailyRate} ta / ish kuni</strong>
             </div>
           </div>
         </div>
@@ -158,7 +244,7 @@ export default function Kpi() {
                         <div style={{ width: `${op.pct}%`, height: '100%', background: op.pct >= 90 ? '#22c55e' : '#3b82f6' }} />
                       </div>
                     </td>
-                    <td>{op.dailyAvg} ta/kun</td>
+                    <td>{op.dailyAvg} ta/ish kuni</td>
                     <td>
                       <span className={`badge ${op.status === "A'lo" ? 'badge-green' : op.status === 'Rejada' ? 'badge-indigo' : 'badge-amber'}`}>
                         {op.status}
