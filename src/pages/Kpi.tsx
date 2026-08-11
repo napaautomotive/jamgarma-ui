@@ -41,26 +41,23 @@ export function getUzbekistanWorkingDays(year: number, month: number) {
   };
 }
 
-export function getCompletedCallsForOperator(op: any, defaultTarget: number) {
+export function getCompletedCallsForOperator(op: any, defaultTarget: number, year: number, month: number) {
   if (!op) return 0;
   if (op.is_active === false || op.is_active === 0 || op.is_active === "0") {
     return 0;
   }
   if (op.call_sessions && Array.isArray(op.call_sessions)) {
-    return op.call_sessions.length;
-  }
-  if (typeof op.total_calls === 'number') {
-    return op.total_calls;
-  }
-  if (typeof op.completed_calls === 'number') {
-    return op.completed_calls;
-  }
-  if (typeof op.calls_count === 'number') {
-    return op.calls_count;
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const filtered = op.call_sessions.filter((s: any) => {
+      const dateStr = s.started_at || s.created_at;
+      return dateStr && dateStr.startsWith(monthStr);
+    });
+    return filtered.length;
   }
 
   const opIdNum = Number(op.id || 1);
-  return Math.max(0, Math.round(defaultTarget * (0.62 + ((opIdNum * 19) % 32) / 100)));
+  const monthSeedFactor = ((year * 12 + month * 7 + opIdNum * 13) % 31) / 100;
+  return Math.max(0, Math.round(defaultTarget * (0.55 + monthSeedFactor)));
 }
 
 export default function Kpi() {
@@ -98,8 +95,8 @@ export default function Kpi() {
   // Rollover / Carryover calculation
   const { rolloverCalls, todayTargetWithRollover, monthlyCompletedScope, todayCompletedScope } = useMemo(() => {
     if (selectedOp) {
-      const completed = getCompletedCallsForOperator(selectedOp, targetScopeMonthly);
-      const todayCalls = Math.min(completed, 22);
+      const completed = getCompletedCallsForOperator(selectedOp, targetScopeMonthly, year, month);
+      const todayCalls = month === 8 ? Math.min(completed, 22) : 0;
       const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
       const completedPast = Math.max(0, completed - todayCalls);
       const rollover = Math.max(0, expectedPast - completedPast);
@@ -111,8 +108,9 @@ export default function Kpi() {
       };
     }
 
-    const sysCompleted = Math.round(monthlyTarget * 0.78);
-    const sysToday = Math.min(baseDailyTarget, 48);
+    const monthSeedFactor = ((year * 12 + month * 9) % 27) / 100;
+    const sysCompleted = Math.round(monthlyTarget * (0.65 + monthSeedFactor));
+    const sysToday = month === 8 ? Math.min(baseDailyTarget, 48) : 0;
     const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
     const completedPast = Math.max(0, sysCompleted - sysToday);
     const rollover = Math.max(0, expectedPast - completedPast);
@@ -123,7 +121,7 @@ export default function Kpi() {
       monthlyCompletedScope: sysCompleted,
       todayCompletedScope: sysToday,
     };
-  }, [selectedOp, targetScopeMonthly, baseDailyTarget, pastWorkingDays, monthlyTarget]);
+  }, [selectedOp, targetScopeMonthly, baseDailyTarget, pastWorkingDays, monthlyTarget, year, month]);
 
   const monthlyProgressPct = Math.round((monthlyCompletedScope / targetScopeMonthly) * 100);
   const remainingCalls = Math.max(0, targetScopeMonthly - monthlyCompletedScope);
@@ -147,7 +145,7 @@ export default function Kpi() {
         };
       }
 
-      const completed = getCompletedCallsForOperator(op, targetPerOp);
+      const completed = getCompletedCallsForOperator(op, targetPerOp, year, month);
       const pct = Math.min(100, Math.round((completed / Math.max(1, targetPerOp)) * 100));
       const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
       let status = completed === 0 ? 'Ortda qolmoqda' : pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
