@@ -71,10 +71,25 @@ export default function Kpi() {
 
   const operators = useMemo(() => {
     const ops = USERS.filter(u => u.role === 'Operator');
-    const count = ops.length || 4;
-    const targetPerOp = Math.ceil(monthlyTarget / count);
+    const activeOps = ops.filter(u => (u as any).is_active !== false);
+    const activeCount = Math.max(1, activeOps.length);
+    const targetPerOp = Math.ceil(monthlyTarget / activeCount);
 
     return ops.map((op, idx) => {
+      const isActive = (op as any).is_active !== false;
+
+      if (!isActive) {
+        return {
+          ...op,
+          target: 0,
+          completed: 0,
+          pct: 0,
+          dailyAvg: 0,
+          status: 'Nofaol',
+          isActive: false
+        };
+      }
+
       const completed = Math.round(targetPerOp * 0.85) - idx * 25;
       const pct = Math.min(100, Math.round((completed / targetPerOp) * 100));
       const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
@@ -85,7 +100,8 @@ export default function Kpi() {
         completed,
         pct,
         dailyAvg,
-        status
+        status,
+        isActive: true
       };
     });
   }, [monthlyTarget, pastWorkingDays]);
@@ -236,17 +252,23 @@ export default function Kpi() {
                 {operators.map(op => (
                   <tr key={op.id}>
                     <td style={{ fontWeight: 600 }}>{op.name}</td>
-                    <td>{op.target} ta</td>
-                    <td><strong style={{ color: 'var(--success)' }}>{op.completed} ta</strong></td>
+                    <td>{op.isActive ? `${op.target} ta` : '0 ta (Nofaol)'}</td>
+                    <td><strong style={{ color: op.isActive ? 'var(--success)' : '#94a3b8' }}>{op.completed} ta</strong></td>
                     <td style={{ minWidth: 120 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{op.pct}%</div>
-                      <div style={{ height: 6, width: '100%', background: '#e2e8f0', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
-                        <div style={{ width: `${op.pct}%`, height: '100%', background: op.pct >= 90 ? '#22c55e' : '#3b82f6' }} />
-                      </div>
+                      {op.isActive ? (
+                        <>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>{op.pct}%</div>
+                          <div style={{ height: 6, width: '100%', background: '#e2e8f0', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
+                            <div style={{ width: `${op.pct}%`, height: '100%', background: op.pct >= 90 ? '#22c55e' : '#3b82f6' }} />
+                          </div>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Hisoblanmaydi</span>
+                      )}
                     </td>
-                    <td>{op.dailyAvg} ta/ish kuni</td>
+                    <td>{op.isActive ? `${op.dailyAvg} ta/ish kuni` : '—'}</td>
                     <td>
-                      <span className={`badge ${op.status === "A'lo" ? 'badge-green' : op.status === 'Rejada' ? 'badge-indigo' : 'badge-amber'}`}>
+                      <span className={`badge ${op.status === "A'lo" ? 'badge-green' : op.status === 'Rejada' ? 'badge-indigo' : op.status === 'Nofaol' ? 'badge-gray' : 'badge-amber'}`}>
                         {op.status}
                       </span>
                     </td>
