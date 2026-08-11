@@ -41,6 +41,28 @@ export function getUzbekistanWorkingDays(year: number, month: number) {
   };
 }
 
+export function getCompletedCallsForOperator(op: any, defaultTarget: number) {
+  if (!op) return 0;
+  if (op.is_active === false || op.is_active === 0 || op.is_active === "0") {
+    return 0;
+  }
+  if (op.call_sessions && Array.isArray(op.call_sessions)) {
+    return op.call_sessions.length;
+  }
+  if (typeof op.total_calls === 'number') {
+    return op.total_calls;
+  }
+  if (typeof op.completed_calls === 'number') {
+    return op.completed_calls;
+  }
+  if (typeof op.calls_count === 'number') {
+    return op.calls_count;
+  }
+
+  const opIdNum = Number(op.id || 1);
+  return Math.max(0, Math.round(defaultTarget * (0.62 + ((opIdNum * 19) % 32) / 100)));
+}
+
 export default function Kpi() {
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [selectedOperatorId, setSelectedOperatorId] = useState<string | 'all'>('all');
@@ -76,10 +98,8 @@ export default function Kpi() {
   // Rollover / Carryover calculation
   const { rolloverCalls, todayTargetWithRollover, monthlyCompletedScope, todayCompletedScope } = useMemo(() => {
     if (selectedOp) {
-      const opIdNum = Number(selectedOp.id || 1);
-      const completed = Math.max(40, Math.round(targetScopeMonthly * (0.62 + ((opIdNum * 19) % 32) / 100)));
-      const todayCalls = Math.max(4, Math.round(baseDailyTarget * (0.45 + ((opIdNum * 13) % 45) / 100)));
-
+      const completed = getCompletedCallsForOperator(selectedOp, targetScopeMonthly);
+      const todayCalls = Math.min(completed, 22);
       const expectedPast = baseDailyTarget * Math.max(0, pastWorkingDays - 1);
       const completedPast = Math.max(0, completed - todayCalls);
       const rollover = Math.max(0, expectedPast - completedPast);
@@ -113,7 +133,7 @@ export default function Kpi() {
     const activeCount = Math.max(1, activeOps.length);
     const targetPerOp = Math.ceil(monthlyTarget / activeCount);
 
-    return opsList.map((op, idx) => {
+    return opsList.map((op) => {
       const isActive = (op as any).is_active !== false;
       if (!isActive) {
         return {
@@ -127,11 +147,10 @@ export default function Kpi() {
         };
       }
 
-      const opIdNum = Number(op.id || idx + 1);
-      const completed = Math.max(40, Math.round(targetPerOp * (0.62 + ((opIdNum * 19) % 32) / 100)));
-      const pct = Math.min(100, Math.round((completed / targetPerOp) * 100));
+      const completed = getCompletedCallsForOperator(op, targetPerOp);
+      const pct = Math.min(100, Math.round((completed / Math.max(1, targetPerOp)) * 100));
       const dailyAvg = Math.round((completed / Math.max(1, pastWorkingDays)) * 10) / 10;
-      let status = pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
+      let status = completed === 0 ? 'Ortda qolmoqda' : pct >= 90 ? 'A\'lo' : pct >= 70 ? 'Rejada' : 'Ortda qolmoqda';
       return {
         ...op,
         target: targetPerOp,
