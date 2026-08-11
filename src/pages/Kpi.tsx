@@ -60,6 +60,11 @@ export function getCompletedCallsForOperator(op: any, defaultTarget: number, yea
   return Math.max(0, Math.round(defaultTarget * (0.55 + monthSeedFactor)));
 }
 
+export const UZ_MONTH_NAMES = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
+];
+
 export function generatePastMonthsList(count = 12) {
   const months = [];
   const today = new Date();
@@ -71,9 +76,9 @@ export function generatePastMonthsList(count = 12) {
     const y = d.getFullYear();
     const m = d.getMonth() + 1;
     const val = `${y}-${String(m).padStart(2, '0')}`;
-    const mName = d.toLocaleString('uz-UZ', { month: 'long', year: 'numeric' });
-    const capitalizedName = mName.charAt(0).toUpperCase() + mName.slice(1);
-    const label = i === 0 ? `${capitalizedName} (Joriy oy)` : capitalizedName;
+    const mName = UZ_MONTH_NAMES[m - 1];
+    const monthYearLabel = `${mName} ${y}`;
+    const label = i === 0 ? `${monthYearLabel} (Joriy oy)` : monthYearLabel;
 
     months.push({ value: val, label });
   }
